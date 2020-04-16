@@ -1,5 +1,7 @@
 from tkinter import *
 from tkinter.ttk import *
+from math import *
+from scipy.stats import chi2
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -11,21 +13,21 @@ root.geometry("1000x950")
 photo = PhotoImage(file = r"D:\\education\\kids-codes\\py\\pt1.png")   
 Label(root, image=photo).grid(row=0, column=0, columnspan=7) 
 
-#-----------Functions------------#
+#--Functions---#
 def inverseF(y, p):
 	return (1 / p) * np.log(1 / (1 - y))
 
 def MyF(x):
-	return len(vs[vs < x]) / len(vs)
+	return len(vs[vs <= x]) / len(vs)
 
 def f(x, k):
 	return k*np.exp(-k*x)
 
 def F(x, k):
 	return 1.0 - np.exp(-k*x)
-#--------------------------------#
+#--------------#
 
-#---------Main-expriment---------#
+#---Main-expriment---#
 def experiment():
 	a = np.ones(len(params))
 	for i in range(len(params)):
@@ -54,7 +56,7 @@ def init_table():
 	else:
 		for i in range(len(vs)):
 			table.insert("", "end", values=(i, vs[i], exact_values[i]))
-	table.grid(row=17, column=0, columnspan=2, rowspan=5)
+	table.grid(row=15, column=0, columnspan=2, rowspan=5)
 	vsb.configure(command=table.yview)
 
 def go():
@@ -69,10 +71,43 @@ def go():
 		k = sum(params)
 		metrics = calculate_metrics(n, k)
 		init_table()
+		chi_squared_test(k)		
 		metrics_table.insert("", "end", values=(metrics))
-#--------------------------------#
 
-#-------------Metrics------------#
+def chi_squared_test(k):
+	N = len(vs)
+	a, b = 0.0, vs[-1]
+	s = int(entry_s.get())
+	z = np.ones(s + 1)
+	z[0], z[s] = a, b
+	for i in range(1, s):
+		z[i] = (1.0 / k) * np.log(s / (s - i))
+	p = np.ones(s + 1) * (1 / s)
+	p[-1] = -np.exp(-k * z[-1]) + np.exp(-k * z[s - 1])
+	R0 = 0
+	for j in range(s):
+		nj = len(vs[np.logical_and(vs >= z[j], vs < z[j+1])])
+		R0 += (nj - N*p[j]) * (nj - N*p[j]) / (N * p[j])
+	alpha = float(entry_alpha.get())
+	critic_value = 1 - chi2.cdf(x=R0, df=(s - 1))
+
+	pi_str = "Теоретические вероятности q = ["
+	for pi in p:
+		pi_str += " " + str(round(pi, 3)) + ","
+	pi_str += "]"
+	chi2_str = "1 - F(R0) = " + str(critic_value) + " -> "
+	if (critic_value < alpha):
+		chi2_str += "гипотеза о виде распределения отвергается"
+	else:
+		chi2_str += "гипотеза о виде распределения принимается"
+	chi2_label = Label(root, text=chi2_str)
+	pi_label = Label(root, text=pi_str)
+	chi2_label.grid(row=10, column=0, columnspan=2)
+	pi_label.grid(row=11, column=0, columnspan=2)
+
+#--------------------#
+
+#---Metrics---#
 def median(n):
 	if n == 1:
 		return vs[0]
@@ -114,7 +149,7 @@ def create_metrics_table():
 	vsb = Scrollbar(orient="vertical", command=metrics_table.yview)
 	metrics_table.configure(yscrollcommand=vsb.set)
 	vsb.configure(command=metrics_table.yview)	
-#--------------------------------#
+#-------------#
 
 #---Parameters-of-distribution---#
 def init_params(entry_params, a):
@@ -148,7 +183,7 @@ def input_params(k):
 	go_button.grid(row=k, column=0, columnspan=2, pady=10)
 #--------------------------------#
 
-#-----------Histogramm-----------#
+#---Histogramm---#
 def init_hist_table(hist_data):
 	cols = ('x_i', 'f(x_i)', 'n_i / (n * l_i)')
 	density_table = Treeview(root, selectmode='browse', columns=cols, show='headings')
@@ -160,8 +195,32 @@ def init_hist_table(hist_data):
 	for row in hist_data:
 		density_table.insert("", "end", values=(row))
 	vsb.configure(command=density_table.yview)
-	density_table.grid(row=12, column=0, columnspan=5)
+	mhd = max_difference_hist(hist_data)
+	str_mhd = "max|f(x_i) - n_i / (n * l_i)| = " + str(mhd[1])
+	str_mhd += " в точке " + str(round(mhd[0], 5))
+	max_hist_label = Label(root, text=str_mhd)
+	density_table.grid(row=12, column=0, columnspan=4)
+	max_hist_label.grid(row=13, column=0, columnspan=2, rowspan=2)
 
+def draw_bar_for_hist(yi, a, b):
+	y = np.ones(100) * yi
+	x = np.linspace(a, b, 100)
+	l1 = plt.plot(x, y, linewidth=1.5, color = "r")
+	x = np.ones(100) * b
+	y = np.linspace(yi, 0, 100)
+	l1 = plt.plot(x, y, linewidth=1.5, color = "r")
+	x = np.ones(100) * a
+	l1 = plt.plot(x, y, linewidth=1.5, color = "r")
+
+def max_difference_hist(hist_data):
+	res, xres = 0, 0
+	for row in hist_data:
+		val = np.abs(row[1]-row[2]) 
+		if val > res:
+			xres = row[0]
+			res = val
+	return xres, res
+    
 def draw_user_hist(ui, entry_intervals):
 	intervals = [i for i in entry_intervals.get().split()]
 	li = len(intervals)
@@ -180,14 +239,7 @@ def draw_user_hist(ui, entry_intervals):
 		yi = ni / (n * (b - a))
 		row = zi, f(zi, k), yi
 		hist_data.append(row)
-		y = np.ones(100) * yi
-		x = np.linspace(a, b, 100)
-		l1 = plt.plot(x, y, linewidth=1.5, color = "r")
-		x = np.ones(100) * b
-		y = np.linspace(yi, 0, 100)
-		l1 = plt.plot(x, y, linewidth=1.5, color = "r")
-		x = np.ones(100) * a
-		l1 = plt.plot(x, y, linewidth=1.5, color = "r")
+		draw_bar_for_hist(yi, a, b)
 	x_value = np.linspace(float(intervals[0]), float(intervals[li-1]), 1000)
 	y_value = f(x_value, k)
 	l = plt.plot(x_value, y_value, linewidth=1.5, color="b")
@@ -213,14 +265,14 @@ def draw_unif_hist(ui, entry_a, entry_b, entry_s):
 		ni = len(values)
 		row = zi, f(zi, k), ni/(n*step)
 		hist_data.append(row)
-	init_hist_table(hist_data)
 	x_value = np.linspace(a, b, 1000)
 	y_value = f(x_value, k)
 	l = plt.plot(x_value, y_value, linewidth=1.5, color="b")
+	init_hist_table(hist_data)
 	plt.show()
-#--------------------------------#
+#----------------#
 
-#----Intervals-for-histogramm----#
+#---Intervals-for-histogramm---#
 def user_intervals(abi):
 	abi.destroy()
 	ui = Toplevel()
@@ -278,9 +330,9 @@ def calc_taks_taks():
 	print(list_D)
 	ni = len(list_D[list_D>l])
 	print(ni/len(metrics_table.get_children()))
-#--------------------------------#
+#------------------------------#
 
-#------------Draw-CDF------------#
+#---Draw-CDF---#
 def draw_cdf():
 	n = len(vs)
 	a, b = vs[0], vs[n - 1]
@@ -293,7 +345,7 @@ def draw_cdf():
 	if n < 500:
 		for i in range(n - 1):
 			myx_value = np.linspace(vs[i], vs[i+1], 1000)
-			myy_value = np.ones(1000) * MyF(vs[i]/2 + vs[i+1]/2)
+			myy_value = np.ones(1000) * MyF(vs[i+1])
 			l = plt.plot(myx_value, myy_value, color="r")
 	else:
 		myx_value = ex_value
@@ -301,37 +353,46 @@ def draw_cdf():
 		myy_value = vecMyF(myx_value)
 		l = plt.plot(myx_value, myy_value, color="r")
 	plt.show()
-#--------------------------------#
 
 label_input = Label(root, text="\nВходные данные")
 label_input.grid(row=1, column=0, columnspan=2)
 
 label_k = Label(root, text="Число мужчин k = ")
 label_N = Label(root, text="Число экспериментов N = ")
+label_s = Label(root, text="Число интервалов для критерия согласия s = ")
+label_alpha = Label(root, text="Уровень значимости α = ")
 
 label_k.grid(row=2, column=0, sticky=E)
 label_N.grid(row=3, column=0, sticky=E)
+label_s.grid(row=4, column=0, sticky=E)
+label_alpha.grid(row=5, column=0, sticky=E)
 
 entry_k = Entry(root)
 entry_N = Entry(root)
+global entry_s 
+entry_s = Entry(root)
+global entry_alpha 
+entry_alpha = Entry(root)
 
 entry_k.grid(row=2, column=1, sticky=W)
 entry_N.grid(row=3, column=1, sticky=W)
+entry_s.grid(row=4, column=1, sticky=W)
+entry_alpha.grid(row=5, column=1, sticky=W)
 
 params_button = Button(root, text="Задать параметры", command=lambda:input_params(entry_k.get()))
-params_button.grid(row=5, column=0, pady=10)
+params_button.grid(row=6, column=0, pady=10)
 
 button = Button(root, text="Запустить", command=go)
-button.grid(row=5, column=1, pady=10)
+button.grid(row=6, column=1, pady=10)
 
 draw_button = Button(root, text="Нарисовать гистрограмму", command=lambda:ask_about_intervals())
-draw_button.grid(row=6, column=1, pady=10)
+draw_button.grid(row=7, column=1, pady=10)
 
 create_metrics_table()
 #calc_butt = Button(root, text="Проверка", command=lambda:calc_taks_taks())
 #calc_butt.grid(row=6, column=0, pady=10)
 
 cdf_button = Button(root, text="Нарисовать ФР", command=lambda:draw_cdf())
-cdf_button.grid(row=6, column=0, pady=10)
+cdf_button.grid(row=7, column=0, pady=10)
 root.mainloop()
 
