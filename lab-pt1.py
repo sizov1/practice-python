@@ -74,20 +74,25 @@ def go():
 		chi_squared_test(k)		
 		metrics_table.insert("", "end", values=(metrics))
 
+def intervals_chi_squared(s, k):
+	z = np.ones(s - 1)
+	for i in range(s - 1):
+		z[i] = -np.log((s - 1 - i) / s) / k
+	return z
+	
 def chi_squared_test(k):
 	N = len(vs)
-	a, b = 0.0, vs[-1]
 	s = int(entry_s.get())
-	z = np.ones(s + 1)
-	z[0], z[s] = a, b
-	for i in range(1, s):
-		z[i] = (1.0 / k) * np.log(s / (s - i))
-	p = np.ones(s + 1) * (1 / s)
-	p[-1] = -np.exp(-k * z[-1]) + np.exp(-k * z[s - 1])
+	if (s < 1):
+		return
+	
+	z = intervals_chi_squared(s, k)
+	p = np.ones(s) * (1 / s)
 	R0 = 0
-	for j in range(s):
+	for j in range(s - 2):
 		nj = len(vs[np.logical_and(vs >= z[j], vs < z[j+1])])
 		R0 += (nj - N*p[j]) * (nj - N*p[j]) / (N * p[j])
+		
 	alpha = float(entry_alpha.get())
 	critic_value = 1 - chi2.cdf(x=R0, df=(s - 1))
 
@@ -220,7 +225,7 @@ def max_difference_hist(hist_data):
 			xres = row[0]
 			res = val
 	return xres, res
-    
+	
 def draw_user_hist(ui, entry_intervals):
 	intervals = [i for i in entry_intervals.get().split()]
 	li = len(intervals)
