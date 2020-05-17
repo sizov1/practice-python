@@ -10,8 +10,8 @@ root.title('Моделирование случайной величины')
 root.geometry("1000x950")
 #root.resizable(False, False)
 
-photo = PhotoImage(file = r"D:\\education\\kids-codes\\py\\pt1.png")   
-Label(root, image=photo).grid(row=0, column=0, columnspan=7) 
+#photo = PhotoImage(file = r"D:\\education\\kids-codes\\py\\pt1.png")   
+#Label(root, image=photo).grid(row=0, column=0, columnspan=7) 
 
 #--Functions---#
 def inverseF(y, p):
@@ -95,11 +95,9 @@ def chi_squared_test(k):
 		
 	alpha = float(entry_alpha.get())
 	critic_value = 1 - chi2.cdf(x=R0, df=(s - 1))
-
-	pi_str = "Теоретические вероятности q = ["
-	for pi in p:
-		pi_str += " " + str(round(pi, 3)) + ","
-	pi_str += "]"
+ 
+	pi_str = "Теоретические вероятности q[i] = " + str(1 / s)
+	pi_str += "(i = 1, ..., s - 1)"
 	chi2_str = "1 - F(R0) = " + str(critic_value) + " -> "
 	if (critic_value < alpha):
 		chi2_str += "гипотеза о виде распределения отвергается"
